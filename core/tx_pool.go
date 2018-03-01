@@ -33,7 +33,6 @@ import (
 	"github.com/ethereum/go-ethereum/metrics"
 	"github.com/ethereum/go-ethereum/params"
 	"gopkg.in/karalabe/cookiejar.v2/collections/prque"
-
 )
 
 var (
@@ -105,12 +104,9 @@ type TxPool struct {
 	quit chan struct{}
 
 	homestead bool
-
-	selfId int // id for this trans (huanke)
 }
 
-func NewTxPool(config *params.ChainConfig, eventMux *event.TypeMux, currentStateFn stateFn, gasLimitFn func() *big.Int,
-	selfId int) *TxPool {
+func NewTxPool(config *params.ChainConfig, eventMux *event.TypeMux, currentStateFn stateFn, gasLimitFn func() *big.Int) *TxPool {
 	pool := &TxPool{
 		config:       config,
 		signer:       types.NewEIP155Signer(config.ChainId),
@@ -126,10 +122,7 @@ func NewTxPool(config *params.ChainConfig, eventMux *event.TypeMux, currentState
 		localTx:      newTxSet(),
 		events:       eventMux.Subscribe(ChainHeadEvent{}, GasPriceChanged{}, RemovedTransactionEvent{}),
 		quit:         make(chan struct{}),
-		selfId:	selfId,
 	}
-
-	// TODO: @ardhi add selfid
 
 	pool.wg.Add(2)
 	go pool.eventLoop()
@@ -181,7 +174,7 @@ func (pool *TxPool) resetState() {
 	pool.pendingState = managedState
 
 	if len(pool.pending) > 0 {
-		glog.V(logger.Error).Infof("@RD reset: > ", pool.selfId, "--> pending length: ", len(pool.pending))
+		glog.V(logger.Error).Infof("@RD reset --> pending length: ", len(pool.pending))
 		time.Sleep(30*time.Second)
 	}
 
@@ -191,7 +184,7 @@ func (pool *TxPool) resetState() {
 	// higher gas price)
 	pool.demoteUnexecutables()
 
-	glog.V(logger.Error).Infof("@RD RESETTING node: < ", pool.selfId, "pending len: ", len(pool.pending))
+	glog.V(logger.Error).Infof("@RD RESETTING node: < pending len: ", len(pool.pending))
 
 	// Update all accounts to the latest known pending nonce
 	for addr, list := range pool.pending {

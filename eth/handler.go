@@ -93,14 +93,12 @@ type ProtocolManager struct {
 
 	badBlockReportingEnabled bool
 
-	selfId int
 	peerArray []*peer
 }
 
 // NewProtocolManager returns a new ethereum sub protocol manager. The Ethereum sub protocol manages peers capable
 // with the ethereum network.
-func NewProtocolManager(config *params.ChainConfig, fastSync bool, networkId int, maxPeers int, mux *event.TypeMux, txpool txPool, pow pow.PoW, blockchain *core.BlockChain, chaindb ethdb.Database,
-	selfId int) (*ProtocolManager, error) {
+func NewProtocolManager(config *params.ChainConfig, fastSync bool, networkId int, maxPeers int, mux *event.TypeMux, txpool txPool, pow pow.PoW, blockchain *core.BlockChain, chaindb ethdb.Database) (*ProtocolManager, error) {
 	// Create the protocol manager with the base fields
 	manager := &ProtocolManager{
 		networkId:   networkId,
@@ -115,7 +113,6 @@ func NewProtocolManager(config *params.ChainConfig, fastSync bool, networkId int
 		noMorePeers: make(chan struct{}),
 		txsyncCh:    make(chan *txsync),
 		quitSync:    make(chan struct{}),
-		selfId: selfId,
 	}
 	// Figure out whether to allow fast sync or not
 	if fastSync && blockchain.CurrentBlock().NumberU64() > 0 {
@@ -659,14 +656,13 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 	case msg.Code == NewBlockMsg:
 		// Retrieve and decode the propagated block
 		var request newBlockData
-
-		glog.V(logger.Error).Infoln("@RD handle msg : NewBlockMsg", p.PeerId(), pm.selfId, request.Block.Number())
-
 		if err := msg.Decode(&request); err != nil {
 			return errResp(ErrDecode, "%v: %v", msg, err)
 		}
 		request.Block.ReceivedAt = msg.ReceivedAt
 		request.Block.ReceivedFrom = p
+
+		glog.V(logger.Error).Infoln("@RD handle msg : NewBlockMsg", request.Block.Number())
 
 		// Mark the peer as owning the block and schedule it for import
 		p.MarkBlock(request.Block.Hash())
@@ -697,10 +693,6 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 		}
 
 	case msg.Code == TxMsg:
-
-		glog.V(logger.Info).Infoln("@RD ====> receiveTxMsg ", p.PeerId(),pm.selfId)
-
-
 		// Transactions arrived, make sure we have a valid and fresh chain to handle them
 		if atomic.LoadUint32(&pm.synced) == 0 {
 			glog.V(logger.Info).Infoln("@huanke ====> receiveTxMsg. NOT SYNC.")
@@ -748,7 +740,6 @@ func (pm *ProtocolManager) BroadcastBlock(block *types.Block, propagate bool) {
 		// Send the block to a subset of our peers
 		transfer := peers[:int(math.Sqrt(float64(len(peers))))]
 		for _, peer := range transfer {
-			glog.V(logger.Error).Infof("@RD Self: ", pm.selfId, " BroadcastBlock to Peer: ", peer.PeerId())
 			peer.SendNewBlock(block, td)
 		}
 		glog.V(logger.Detail).Infof("propagated block %x to %d peers in %v", hash[:4], len(transfer), time.Since(block.ReceivedAt))
@@ -769,7 +760,6 @@ func (pm *ProtocolManager) BroadcastTx(hash common.Hash, tx *types.Transaction) 
 	peers := pm.peers.PeersWithoutTx(hash)
 	//FIXME include this again: peers = peers[:int(math.Sqrt(float64(len(peers))))]
 	for _, peer := range peers {
-		glog.V(logger.Info).Infof("@RD BroadcastTX Self: ", pm.selfId, " BroadcastTx to Peer: ", peer.PeerId())
 		peer.SendTransactions(types.Transactions{tx})
 	}
 	glog.V(logger.Error).Infoln("broadcast tx to", len(peers), "peers")

@@ -94,7 +94,6 @@ func (pm *ProtocolManager) txsyncLoop() {
 		// Send the pack in the background.
 		glog.V(logger.Error).Infof("%v: sending %d transactions (%v)", s.p.Peer, len(pack.txs), size)
 		sending = true
-		glog.V(logger.Error).Infof("@RD txsyncLoop() self: ", pm.selfId, " peer: ", s.p.PeerId())
 		go func() { done <- pack.p.SendTransactions(pack.txs) }()
 	}
 
@@ -115,7 +114,7 @@ func (pm *ProtocolManager) txsyncLoop() {
 	for {
 		select {
 		case s := <-pm.txsyncCh:
-			glog.V(logger.Error).Infoln("@RD read pm.txsyncCh  ", s.p.PeerId())
+			glog.V(logger.Error).Infoln("@RD read pm.txsyncCh")
 			pending[s.p.ID()] = s
 			if !sending {
 				send(s)
