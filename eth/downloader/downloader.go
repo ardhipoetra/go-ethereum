@@ -388,9 +388,9 @@ func (d *Downloader) syncWithPeer(p *peer, hash common.Hash, td *big.Int) (err e
 		return errTooOld
 	}
 
-	glog.V(logger.Debug).Infof("Synchronising with the network using: %s [eth/%d]", p.id, p.version)
+	glog.V(logger.Error).Infof("Synchronising with the network using: %s [eth/%d]", p.id, p.version)
 	defer func(start time.Time) {
-		glog.V(logger.Debug).Infof("Synchronisation terminated after %v", time.Since(start))
+		glog.V(logger.Error).Infof("Synchronisation terminated after %v", time.Since(start))
 	}(time.Now())
 
 	// Look up the sync boundaries: the common ancestor and the target block

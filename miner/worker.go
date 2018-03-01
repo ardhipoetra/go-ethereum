@@ -234,6 +234,7 @@ func (self *worker) update() {
 			self.uncleMu.Unlock()
 		case core.TxPreEvent:
 			// Apply transaction to the pending state if we're not mining
+			glog.V(logger.Error).Infoln("@RD I mine?", atomic.LoadInt32(&self.mining))
 			if atomic.LoadInt32(&self.mining) == 0 {
 				self.currentMu.Lock()
 
@@ -241,9 +242,18 @@ func (self *worker) update() {
 				txs := map[common.Address]types.Transactions{acc: types.Transactions{ev.Tx}}
 				txset := types.NewTransactionsByPriceAndNonce(txs)
 
+
+				glog.V(logger.Error).Infoln("@RD committing transaction", ev.Tx.Nonce())
+
 				self.current.commitTransactions(self.mux, txset, self.gasPrice, self.chain)
 				self.currentMu.Unlock()
 			}
+			//huanke add commitNewWork here to make sure pending's length changed when start mining before sendTx
+			if atomic.LoadInt32(&self.mining) == 1 {
+				glog.V(logger.Error).Infoln("@RD TxPreEvent miner node")
+				self.commitNewWork()
+			}
+
 		}
 	}
 }
@@ -272,6 +282,8 @@ func (self *worker) wait() {
 			block := result.Block
 			work := result.Work
 
+
+			glog.V(logger.Error).Infoln("@RD worker.wait() ",  len(self.recv), block.Number(), self.fullValidation)
 			if self.fullValidation {
 				if _, err := self.chain.InsertChain(types.Blocks{block}); err != nil {
 					glog.V(logger.Error).Infoln("mining err", err)
@@ -322,10 +334,12 @@ func (self *worker) wait() {
 
 				// broadcast before waiting for validation
 				go func(block *types.Block, logs vm.Logs, receipts []*types.Receipt) {
+					glog.V(logger.Error).Infoln("@RD post *** NewMinedBlockEvent", block.Number())
 					self.mux.Post(core.NewMinedBlockEvent{Block: block})
 					self.mux.Post(core.ChainEvent{Block: block, Hash: block.Hash(), Logs: logs})
 
 					if stat == core.CanonStatTy {
+						glog.V(logger.Error).Infoln("@RD get ChainHeadEvent ***", block.Number())
 						self.mux.Post(core.ChainHeadEvent{Block: block})
 						self.mux.Post(logs)
 					}
@@ -504,8 +518,29 @@ func (self *worker) commitNewWork() {
 	if self.config.DAOForkSupport && self.config.DAOForkBlock != nil && self.config.DAOForkBlock.Cmp(header.Number) == 0 {
 		core.ApplyDAOHardFork(work.state)
 	}
-	txs := types.NewTransactionsByPriceAndNonce(self.eth.TxPool().Pending())
-	work.commitTransactions(self.mux, txs, self.gasPrice, self.chain)
+
+	//---------------------Hack to mine one transaction once -------------------------------
+	pending:= self.eth.TxPool().Pending()
+	glog.V(logger.Info).Infoln("@RD ==========================> commitNewWork ", len(pending))
+	txCollection:= make([]map[common.Address]types.Transactions, len(pending))
+	for key, value:= range pending {
+		oneTx := make(map[common.Address]types.Transactions)
+		oneTx[key]=value
+		txCollection = append(txCollection, oneTx)
+		glog.V(logger.Info).Infoln("@RD  --> ",key, value)
+	}
+	if len(pending)>0 {
+		glog.V(logger.Info).Infoln("@RD ===============> commitTransactions ", txCollection[len(pending):][0])
+		txs := types.NewTransactionsByPriceAndNonce(txCollection[len(pending):][0])
+		work.commitTransactions(self.mux, txs, self.gasPrice, self.chain)
+	}else {
+		txs := types.NewTransactionsByPriceAndNonce(pending)
+		work.commitTransactions(self.mux, txs, self.gasPrice, self.chain)
+	}
+	//---------------------Hack to mine one transaction once -------------------------------
+	//txs := types.NewTransactionsByPriceAndNonce(self.eth.TxPool().Pending())
+	//work.commitTransactions(self.mux, txs, self.gasPrice, self.chain)
+	//----- end of hack
 
 	self.eth.TxPool().RemoveBatch(work.lowGasTxs)
 	self.eth.TxPool().RemoveBatch(work.failedTxs)
@@ -548,7 +583,13 @@ func (self *worker) commitNewWork() {
 		glog.V(logger.Info).Infof("commit new work on block %v with %d txs & %d uncles. Took %v\n", work.Block.Number(), work.tcount, len(uncles), time.Since(tstart))
 		self.logLocalMinedBlocks(work, previous)
 	}
-	self.push(work)
+
+	//huanke wants to mine when there are transactions
+	if len(self.eth.TxPool().Pending()) >0 {
+		glog.V(logger.Info).Infoln("@RD **************push(work)", work.Block.Number(), len(self.eth.TxPool().Pending()))
+		self.push(work)
+	}
+	//self.push(work)
 }
 
 func (self *worker) commitUncle(work *Work, uncle *types.Header) error {

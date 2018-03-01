@@ -1031,6 +1031,8 @@ func submitTransaction(ctx context.Context, b Backend, tx *types.Transaction, si
 	signer := types.MakeSigner(b.ChainConfig(), b.CurrentBlock().Number())
 
 	signedTx, err := tx.WithSignature(signer, signature)
+
+	glog.V(logger.Error).Infoln("@RD submitTransaction >> ", signedTx.Nonce())
 	if err != nil {
 		return common.Hash{}, err
 	}
@@ -1066,6 +1068,8 @@ func (s *PublicTransactionPoolAPI) SendTransaction(ctx context.Context, args Sen
 		}
 		args.Nonce = rpc.NewHexNumber(nonce)
 	}
+
+	glog.V(logger.Error).Infoln("@RD sendtransaction Nonce >> ", args.Nonce)
 
 	var tx *types.Transaction
 	if args.To == nil {
