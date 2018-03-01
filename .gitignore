@@ -33,3 +33,5 @@ profile.cov
 
 _scripts/*
 storage/*
+
+.idea/
