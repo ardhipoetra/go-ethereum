@@ -39,6 +39,8 @@ import (
 type EthApiBackend struct {
 	eth *Ethereum
 	gpo *gasprice.GasPriceOracle
+
+	//selfId int
 }
 
 func (b *EthApiBackend) ChainConfig() *params.ChainConfig {

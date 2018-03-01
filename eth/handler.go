@@ -92,11 +92,15 @@ type ProtocolManager struct {
 	wg sync.WaitGroup
 
 	badBlockReportingEnabled bool
+
+	selfId int
+	peerArray []*peer
 }
 
 // NewProtocolManager returns a new ethereum sub protocol manager. The Ethereum sub protocol manages peers capable
 // with the ethereum network.
-func NewProtocolManager(config *params.ChainConfig, fastSync bool, networkId int, maxPeers int, mux *event.TypeMux, txpool txPool, pow pow.PoW, blockchain *core.BlockChain, chaindb ethdb.Database) (*ProtocolManager, error) {
+func NewProtocolManager(config *params.ChainConfig, fastSync bool, networkId int, maxPeers int, mux *event.TypeMux, txpool txPool, pow pow.PoW, blockchain *core.BlockChain, chaindb ethdb.Database,
+	selfId int) (*ProtocolManager, error) {
 	// Create the protocol manager with the base fields
 	manager := &ProtocolManager{
 		networkId:   networkId,
@@ -111,6 +115,7 @@ func NewProtocolManager(config *params.ChainConfig, fastSync bool, networkId int
 		noMorePeers: make(chan struct{}),
 		txsyncCh:    make(chan *txsync),
 		quitSync:    make(chan struct{}),
+		selfId: selfId,
 	}
 	// Figure out whether to allow fast sync or not
 	if fastSync && blockchain.CurrentBlock().NumberU64() > 0 {
@@ -120,6 +125,9 @@ func NewProtocolManager(config *params.ChainConfig, fastSync bool, networkId int
 	if fastSync {
 		manager.fastSync = uint32(1)
 	}
+
+	manager.peerArray = make([]*peer, manager.peers.Len())
+
 	// Initiate a sub-protocol for every implemented version we can handle
 	manager.SubProtocols = make([]p2p.Protocol, 0, len(ProtocolVersions))
 	for i, version := range ProtocolVersions {
@@ -185,6 +193,7 @@ func NewProtocolManager(config *params.ChainConfig, fastSync bool, networkId int
 }
 
 func (pm *ProtocolManager) insertChain(blocks types.Blocks) (i int, err error) {
+	glog.V(logger.Error).Infoln("@RD handler.insertChain")
 	i, err = pm.blockchain.InsertChain(blocks)
 	if pm.badBlockReportingEnabled && core.IsValidationErr(err) && i < len(blocks) {
 		go sendBadBlockReport(blocks[i], err)
@@ -331,6 +340,7 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 	// Handle the message depending on its contents
 	switch {
 	case msg.Code == StatusMsg:
+		glog.V(logger.Error).Infoln("@RD handle msg : StatusMsg")
 		// Status messages should never arrive after the handshake
 		return errResp(ErrExtraStatusMsg, "uncontrolled status message")
 
@@ -649,6 +659,9 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 	case msg.Code == NewBlockMsg:
 		// Retrieve and decode the propagated block
 		var request newBlockData
+
+		glog.V(logger.Error).Infoln("@RD handle msg : NewBlockMsg", p.PeerId(), pm.selfId, request.Block.Number())
+
 		if err := msg.Decode(&request); err != nil {
 			return errResp(ErrDecode, "%v: %v", msg, err)
 		}
@@ -657,6 +670,9 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 
 		// Mark the peer as owning the block and schedule it for import
 		p.MarkBlock(request.Block.Hash())
+
+		glog.V(logger.Error).Infoln("@RD handle msg : NewBlockMsg. Will fetch ..... ")
+
 		pm.fetcher.Enqueue(p.id, request.Block)
 
 		// Assuming the block is importable by the peer, but possibly not yet done so,
@@ -667,6 +683,7 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 		)
 		// Update the peers total difficulty if better than the previous
 		if _, td := p.Head(); trueTD.Cmp(td) > 0 {
+			glog.V(logger.Error).Infoln("@RD handle msg : NewBlockMsg. Update the peers total difficulty if better than the previous")
 			p.SetHead(trueHead, trueTD)
 
 			// Schedule a sync if above ours. Note, this will not fire a sync for a gap of
@@ -674,13 +691,19 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 			// scenario should easily be covered by the fetcher.
 			currentBlock := pm.blockchain.CurrentBlock()
 			if trueTD.Cmp(pm.blockchain.GetTd(currentBlock.Hash(), currentBlock.NumberU64())) > 0 {
+				glog.V(logger.Error).Infoln("@RD handle msg : NewBlockMsg. Synchronize")
 				go pm.synchronise(p)
 			}
 		}
 
 	case msg.Code == TxMsg:
+
+		glog.V(logger.Info).Infoln("@RD ====> receiveTxMsg ", p.PeerId(),pm.selfId)
+
+
 		// Transactions arrived, make sure we have a valid and fresh chain to handle them
 		if atomic.LoadUint32(&pm.synced) == 0 {
+			glog.V(logger.Info).Infoln("@huanke ====> receiveTxMsg. NOT SYNC.")
 			break
 		}
 		// Transactions can be processed, parse all of them and deliver to the pool
@@ -693,6 +716,7 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 			if tx == nil {
 				return errResp(ErrDecode, "transaction %d is nil", i)
 			}
+			glog.V(logger.Info).Infoln("@huanke ====> receiveTxMsg. YEAH SYNC.", tx.Nonce())
 			p.MarkTransaction(tx.Hash())
 		}
 		pm.txpool.AddBatch(txs)
@@ -709,6 +733,8 @@ func (pm *ProtocolManager) BroadcastBlock(block *types.Block, propagate bool) {
 	hash := block.Hash()
 	peers := pm.peers.PeersWithoutBlock(hash)
 
+	glog.V(logger.Info).Infof("@RD BroadcastBlock ", block.Number(), propagate, len(peers))
+
 	// If propagation is requested, send to a subset of the peer
 	if propagate {
 		// Calculate the TD of the block (it's not imported yet, so block.Td is not valid)
@@ -722,6 +748,7 @@ func (pm *ProtocolManager) BroadcastBlock(block *types.Block, propagate bool) {
 		// Send the block to a subset of our peers
 		transfer := peers[:int(math.Sqrt(float64(len(peers))))]
 		for _, peer := range transfer {
+			glog.V(logger.Error).Infof("@RD Self: ", pm.selfId, " BroadcastBlock to Peer: ", peer.PeerId())
 			peer.SendNewBlock(block, td)
 		}
 		glog.V(logger.Detail).Infof("propagated block %x to %d peers in %v", hash[:4], len(transfer), time.Since(block.ReceivedAt))
@@ -742,9 +769,10 @@ func (pm *ProtocolManager) BroadcastTx(hash common.Hash, tx *types.Transaction) 
 	peers := pm.peers.PeersWithoutTx(hash)
 	//FIXME include this again: peers = peers[:int(math.Sqrt(float64(len(peers))))]
 	for _, peer := range peers {
+		glog.V(logger.Info).Infof("@RD BroadcastTX Self: ", pm.selfId, " BroadcastTx to Peer: ", peer.PeerId())
 		peer.SendTransactions(types.Transactions{tx})
 	}
-	glog.V(logger.Detail).Infoln("broadcast tx to", len(peers), "peers")
+	glog.V(logger.Error).Infoln("broadcast tx to", len(peers), "peers")
 }
 
 // Mined broadcast loop
@@ -753,6 +781,7 @@ func (self *ProtocolManager) minedBroadcastLoop() {
 	for obj := range self.minedBlockSub.Chan() {
 		switch ev := obj.Data.(type) {
 		case core.NewMinedBlockEvent:
+			glog.V(logger.Error).Infoln("@RD minedBroadcastLoop  ", ev.Block.Number())
 			self.BroadcastBlock(ev.Block, true)  // First propagate block to peers
 			self.BroadcastBlock(ev.Block, false) // Only then announce to the rest
 		}
@@ -763,6 +792,7 @@ func (self *ProtocolManager) txBroadcastLoop() {
 	// automatically stops if unsubscribe
 	for obj := range self.txSub.Chan() {
 		event := obj.Data.(core.TxPreEvent)
+		glog.V(logger.Error).Infoln("@RD txBroadcastLoop  ", event.Tx.Nonce())
 		self.BroadcastTx(event.Tx.Hash(), event.Tx)
 	}
 }

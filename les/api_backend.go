@@ -151,3 +151,7 @@ func (b *LesApiBackend) EventMux() *event.TypeMux {
 func (b *LesApiBackend) AccountManager() *accounts.Manager {
 	return b.eth.accountManager
 }
+
+func (self *LesApiBackend) GetSelfId() int {
+	return -1
+}

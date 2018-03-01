@@ -310,6 +310,8 @@ func startNode(ctx *cli.Context, stack *node.Node) {
 	// Start up the node itself
 	utils.StartNode(stack)
 
+	glog.V(logger.Error).Infoln("@RD node started on ", stack)
+
 	// Unlock any account specifically requested
 	accman := stack.AccountManager()
 	passwords := utils.MakePasswordList(ctx)

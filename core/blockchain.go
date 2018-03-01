@@ -600,6 +600,7 @@ func (self *BlockChain) procFutureBlocks() {
 		}
 	}
 	if len(blocks) > 0 {
+		glog.V(logger.Error).Infoln("@RD procFutureblocks-call amount : ", len(blocks))
 		types.BlockBy(types.Number).Sort(blocks)
 		self.InsertChain(blocks)
 	}
@@ -965,9 +966,9 @@ func (self *BlockChain) InsertChain(chain types.Blocks) (int, error) {
 
 		switch status {
 		case CanonStatTy:
-			if glog.V(logger.Debug) {
-				glog.Infof("inserted block #%d [%x…] in %9v: %3d txs %7v gas %d uncles.", block.Number(), block.Hash().Bytes()[0:4], common.PrettyDuration(time.Since(bstart)), len(block.Transactions()), block.GasUsed(), len(block.Uncles()))
-			}
+			//if glog.V(logger.Debug) {
+			glog.Infof("inserted block #%d [%x…] in %9v: %3d txs %7v gas %d uncles.", block.Number(), block.Hash().Bytes()[0:4], common.PrettyDuration(time.Since(bstart)), len(block.Transactions()), block.GasUsed(), len(block.Uncles()))
+			//}
 			blockInsertTimer.UpdateSince(bstart)
 			events = append(events, ChainEvent{block, block.Hash(), logs})
 
@@ -984,9 +985,9 @@ func (self *BlockChain) InsertChain(chain types.Blocks) (int, error) {
 				return i, err
 			}
 		case SideStatTy:
-			if glog.V(logger.Detail) {
-				glog.Infof("inserted forked block #%d [%x…] (TD=%v) in %9v: %3d txs %d uncles.", block.Number(), block.Hash().Bytes()[0:4], block.Difficulty(), common.PrettyDuration(time.Since(bstart)), len(block.Transactions()), len(block.Uncles()))
-			}
+			//if glog.V(logger.Detail) {
+			glog.Infof("inserted forked block #%d [%x…] (TD=%v) in %9v: %3d txs %d uncles.", block.Number(), block.Hash().Bytes()[0:4], block.Difficulty(), common.PrettyDuration(time.Since(bstart)), len(block.Transactions()), len(block.Uncles()))
+			//}
 			blockInsertTimer.UpdateSince(bstart)
 			events = append(events, ChainSideEvent{block, logs})
 

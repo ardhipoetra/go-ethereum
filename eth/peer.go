@@ -30,6 +30,8 @@ import (
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/rlp"
 	"gopkg.in/fatih/set.v0"
+	"strings"
+	"strconv"
 )
 
 var (
@@ -297,6 +299,18 @@ func (p *peer) String() string {
 	return fmt.Sprintf("Peer %s [%s]", p.id,
 		fmt.Sprintf("eth/%2d", p.version),
 	)
+}
+
+//huanke add peer Id to be the identification of the peer node
+func (p *peer) PeerId() int{
+	peerName:= p.Name()  //Geth/v1.4.20-stable-c49c0221/linux/go1.9.2/node2
+	//glog.V(logger.Info).Infof("peerId: ", peerName)
+	splits := strings.SplitAfter(peerName, "/")
+	peerNode := splits[4]
+	arrays:= []rune(peerNode)
+	peerChar := string(arrays[4])
+	peerId, _ := strconv.Atoi(peerChar)
+	return peerId
 }
 
 // peerSet represents the collection of active peers currently participating in

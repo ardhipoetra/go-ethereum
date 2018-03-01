@@ -31,6 +31,7 @@ import (
 	"github.com/ethereum/go-ethereum/p2p/discv5"
 	"github.com/ethereum/go-ethereum/p2p/nat"
 	"github.com/ethereum/go-ethereum/p2p/netutil"
+	"strconv"
 )
 
 const (
@@ -820,4 +821,12 @@ func (srv *Server) PeersInfo() []*PeerInfo {
 		}
 	}
 	return infos
+}
+
+func (srv *Server) SelfId() int  {
+	arrays := []rune(srv.ListenAddr)
+	selfChar := string(arrays[3:4])
+	fmt.Println("@RD SelfId() -- > ", selfChar)
+	selfId,_ := strconv.Atoi(selfChar)
+	return selfId
 }

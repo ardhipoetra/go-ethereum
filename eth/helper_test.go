@@ -63,7 +63,7 @@ func newTestProtocolManager(fastSync bool, blocks int, generator func(int, *core
 		panic(err)
 	}
 
-	pm, err := NewProtocolManager(chainConfig, fastSync, NetworkId, 1000, evmux, &testTxPool{added: newtx}, pow, blockchain, db)
+	pm, err := NewProtocolManager(chainConfig, fastSync, NetworkId, 1000, evmux, &testTxPool{added: newtx}, pow, blockchain, db, 0)
 	if err != nil {
 		return nil, err
 	}

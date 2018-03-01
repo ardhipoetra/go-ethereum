@@ -63,6 +63,8 @@ type Backend interface {
 
 	ChainConfig() *params.ChainConfig
 	CurrentBlock() *types.Block
+
+	//GetSelfId() int
 }
 
 type State interface {

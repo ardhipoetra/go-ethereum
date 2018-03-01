@@ -30,12 +30,16 @@ import (
 )
 
 const (
-	forceSyncCycle      = 10 * time.Second // Time interval to force syncs, even if few peers are available
+	//forceSyncCycle      = 10 * time.Second // Time interval to force syncs, even if few peers are available
 	minDesiredPeerCount = 5                // Amount of peers desired to start syncing
 
 	// This is the target size for the packs of transactions sent by txsyncLoop.
 	// A pack can get larger than this if a single transactions exceeds this size.
-	txsyncPackSize = 100 * 1024
+	//txsyncPackSize = 100 * 1024
+
+	// RD add
+	txsyncPackSize = 1
+	forceSyncCycle      = 1000 * time.Second
 )
 
 type txsync struct {
@@ -47,6 +51,7 @@ type txsync struct {
 func (pm *ProtocolManager) syncTransactions(p *peer) {
 	var txs types.Transactions
 	for _, batch := range pm.txpool.Pending() {
+		glog.V(logger.Error).Infoln("@RD syncTransactions() pm.txpool.Pending() ", len(batch))
 		txs = append(txs, batch...)
 	}
 	if len(txs) == 0 {
@@ -54,6 +59,7 @@ func (pm *ProtocolManager) syncTransactions(p *peer) {
 	}
 	select {
 	case pm.txsyncCh <- &txsync{p, txs}:
+		glog.V(logger.Error).Infoln("@RD pm.txsyncCh")
 	case <-pm.quitSync:
 	}
 }
@@ -86,8 +92,9 @@ func (pm *ProtocolManager) txsyncLoop() {
 			delete(pending, s.p.ID())
 		}
 		// Send the pack in the background.
-		glog.V(logger.Detail).Infof("%v: sending %d transactions (%v)", s.p.Peer, len(pack.txs), size)
+		glog.V(logger.Error).Infof("%v: sending %d transactions (%v)", s.p.Peer, len(pack.txs), size)
 		sending = true
+		glog.V(logger.Error).Infof("@RD txsyncLoop() self: ", pm.selfId, " peer: ", s.p.PeerId())
 		go func() { done <- pack.p.SendTransactions(pack.txs) }()
 	}
 
@@ -108,6 +115,7 @@ func (pm *ProtocolManager) txsyncLoop() {
 	for {
 		select {
 		case s := <-pm.txsyncCh:
+			glog.V(logger.Error).Infoln("@RD read pm.txsyncCh  ", s.p.PeerId())
 			pending[s.p.ID()] = s
 			if !sending {
 				send(s)
@@ -169,11 +177,21 @@ func (pm *ProtocolManager) synchronise(peer *peer) {
 	td := pm.blockchain.GetTd(currentBlock.Hash(), currentBlock.NumberU64())
 
 	pHead, pTd := peer.Head()
-	if pTd.Cmp(td) <= 0 {
+	if pTd.Cmp(td) < 0 {// change so the same TD is allowed
 		return
 	}
 	// Otherwise try to sync with the downloader
 	mode := downloader.FullSync
+
+	//***huanke add it to avoid every 10s sync, then no newBlogMsg to communicate
+	if atomic.LoadUint32(&pm.synced) == 1 {
+		glog.Infoln("@RD *******Not 1st Sync************")
+		return
+	}else{
+		glog.Infoln("@RD *******Is 1st Sync************")
+	}
+	//*******************************************************
+
 	if atomic.LoadUint32(&pm.fastSync) == 1 {
 		mode = downloader.FastSync
 	}

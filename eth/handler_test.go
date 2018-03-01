@@ -471,7 +471,7 @@ func testDAOChallenge(t *testing.T, localForked, remoteForked bool, timeout bool
 		config        = &params.ChainConfig{DAOForkBlock: big.NewInt(1), DAOForkSupport: localForked}
 		blockchain, _ = core.NewBlockChain(db, config, pow, evmux)
 	)
-	pm, err := NewProtocolManager(config, false, NetworkId, 1000, evmux, new(testTxPool), pow, blockchain, db)
+	pm, err := NewProtocolManager(config, false, NetworkId, 1000, evmux, new(testTxPool), pow, blockchain, db, 0)
 	if err != nil {
 		t.Fatalf("failed to start test protocol manager: %v", err)
 	}

@@ -758,6 +758,7 @@ func RegisterEthService(ctx *cli.Context, stack *node.Node, extra []byte) {
 		GpobaseCorrectionFactor: ctx.GlobalInt(GpobaseCorrectionFactorFlag.Name),
 		SolcPath:                ctx.GlobalString(SolcPathFlag.Name),
 		AutoDAG:                 ctx.GlobalBool(AutoDAGFlag.Name) || ctx.GlobalBool(MiningEnabledFlag.Name),
+		DataDir:				 ctx.GlobalString(DataDirFlag.Name),
 	}
 
 	// Override any default configs in dev mode or the test net

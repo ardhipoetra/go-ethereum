@@ -46,6 +46,7 @@ import (
 	"github.com/ethereum/go-ethereum/p2p"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rpc"
+	"strconv"
 )
 
 const (
@@ -100,6 +101,9 @@ type Config struct {
 
 	TestGenesisBlock *types.Block   // Genesis block to seed the chain database with (testing only!)
 	TestGenesisState ethdb.Database // Genesis state to seed the database with (testing only!)
+
+	SelfId int
+	DataDir string
 }
 
 type LesServer interface {
@@ -141,6 +145,8 @@ type Ethereum struct {
 	PowTest       bool
 	netVersionId  int
 	netRPCService *ethapi.PublicNetAPI
+
+	selfId int
 }
 
 func (s *Ethereum) AddLesServer(ls LesServer) {
@@ -163,6 +169,13 @@ func New(ctx *node.ServiceContext, config *Config) (*Ethereum, error) {
 		return nil, err
 	}
 
+	glog.V(logger.Error).Infoln("@RD backend new called with datadir ", config.DataDir)
+
+	last1  := config.DataDir[len(config.DataDir)-1:]
+	selfID, _ := strconv.Atoi(last1)
+	config.SelfId = selfID
+	glog.V(logger.Error).Infof("@RD selfId: ", last1)
+
 	eth := &Ethereum{
 		chainDb:        chainDb,
 		eventMux:       ctx.EventMux,
@@ -177,6 +190,7 @@ func New(ctx *node.ServiceContext, config *Config) (*Ethereum, error) {
 		MinerThreads:   config.MinerThreads,
 		AutoDAG:        config.AutoDAG,
 		solcPath:       config.SolcPath,
+		selfId: config.SelfId,
 	}
 
 	if err := upgradeChainDatabase(chainDb); err != nil {
@@ -223,7 +237,7 @@ func New(ctx *node.ServiceContext, config *Config) (*Ethereum, error) {
 		}
 		return nil, err
 	}
-	newPool := core.NewTxPool(eth.chainConfig, eth.EventMux(), eth.blockchain.State, eth.blockchain.GasLimit)
+	newPool := core.NewTxPool(eth.chainConfig, eth.EventMux(), eth.blockchain.State, eth.blockchain.GasLimit, config.SelfId)
 	eth.txPool = newPool
 
 	maxPeers := config.MaxPeers
@@ -237,7 +251,8 @@ func New(ctx *node.ServiceContext, config *Config) (*Ethereum, error) {
 		}
 	}
 
-	if eth.protocolManager, err = NewProtocolManager(eth.chainConfig, config.FastSync, config.NetworkId, maxPeers, eth.eventMux, eth.txPool, eth.pow, eth.blockchain, chainDb); err != nil {
+	if eth.protocolManager, err = NewProtocolManager(eth.chainConfig, config.FastSync, config.NetworkId, maxPeers, eth.eventMux, eth.txPool, eth.pow, eth.blockchain, chainDb,
+		config.SelfId); err != nil {
 		return nil, err
 	}
 	eth.miner = miner.New(eth, eth.chainConfig, eth.EventMux(), eth.pow)
@@ -526,3 +541,8 @@ func dagFiles(epoch uint64) (string, string) {
 	dag := fmt.Sprintf("full-R%d-%x", ethashRevision, seedHash[:8])
 	return dag, "full-R" + dag
 }
+
+func (self *Config) GetSelfId() int {
+	return self.SelfId
+}
+
