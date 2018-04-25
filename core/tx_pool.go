@@ -33,6 +33,7 @@ import (
 	"github.com/ethereum/go-ethereum/metrics"
 	"github.com/ethereum/go-ethereum/params"
 	"gopkg.in/karalabe/cookiejar.v2/collections/prque"
+	"math/rand"
 )
 
 var (
@@ -104,9 +105,13 @@ type TxPool struct {
 	quit chan struct{}
 
 	homestead bool
+
+	selfId int // id for this trans
 }
 
-func NewTxPool(config *params.ChainConfig, eventMux *event.TypeMux, currentStateFn stateFn, gasLimitFn func() *big.Int) *TxPool {
+
+func NewTxPool(config *params.ChainConfig, eventMux *event.TypeMux, currentStateFn stateFn, gasLimitFn func() *big.Int,
+	selfId int) *TxPool {
 	pool := &TxPool{
 		config:       config,
 		signer:       types.NewEIP155Signer(config.ChainId),
@@ -122,6 +127,7 @@ func NewTxPool(config *params.ChainConfig, eventMux *event.TypeMux, currentState
 		localTx:      newTxSet(),
 		events:       eventMux.Subscribe(ChainHeadEvent{}, GasPriceChanged{}, RemovedTransactionEvent{}),
 		quit:         make(chan struct{}),
+		selfId: selfId,
 	}
 
 	pool.wg.Add(2)
@@ -160,7 +166,7 @@ func (pool *TxPool) eventLoop() {
 }
 
 func (pool *TxPool) resetState() {
-	glog.V(logger.Error).Infoln("@RD === RESETTING STATE ===")
+	glog.V(logger.Error).Infoln("@RD === RESETTING STATE === id :", pool.selfId)
 	currentState, err := pool.currentState()
 	if err != nil {
 		glog.V(logger.Error).Infof("Failed to get current state: %v", err)
@@ -171,11 +177,37 @@ func (pool *TxPool) resetState() {
 		glog.V(logger.Error).Infof("Failed to get managed state: %v", err)
 		return
 	}
+
+	if pool.pendingState != nil && currentState != nil {
+		glog.V(logger.Error).Infoln("@RD === POOL add c8f7-- === ",
+			pool.pendingState.GetNonce(bmineraddress), currentState.GetNonce(bmineraddress))
+	}
+
 	pool.pendingState = managedState
 
 	if len(pool.pending) > 0 {
 		glog.V(logger.Error).Infof("@RD reset --> pending length: ", len(pool.pending))
-		time.Sleep(30*time.Second)
+		if (pool.selfId == 1) {
+			var idsleep = rand.Intn(100)
+
+			glog.V(logger.Error).Infof("@RD SLEEP", pool.selfId, idsleep)
+
+			for kkAddr, _ := range pool.pending {
+				nonce := currentState.GetNonce(kkAddr)
+
+				pendingNonce := int(pool.pendingState.GetNonce(kkAddr))
+				currentNonce := int(nonce)
+
+				glog.V(logger.Error).Infof("@RD BEFORE DEMOTE reset: pending > ",
+					pendingNonce, " cur --> ",
+					currentNonce, "pending length: ", len(pool.pending))
+			}
+
+
+			time.Sleep(20*time.Second)
+			glog.V(logger.Error).Infof("@IM AWAKE", pool.selfId, idsleep)
+		}
+
 	}
 
 	// validate the pool of pending transactions, this will remove
@@ -191,6 +223,17 @@ func (pool *TxPool) resetState() {
 		txs := list.Flatten() // Heavy but will be cached and is needed by the miner anyway
 		pool.pendingState.SetNonce(addr, txs[len(txs)-1].Nonce()+1)
 		glog.V(logger.Error).Infof("@RD RESETTING addr: ", addr.Str(), "Nonce: ",txs[len(txs)-1].Nonce())
+	}
+
+	for kkAddr, _ := range pool.pending {
+		nonce := currentState.GetNonce(kkAddr)
+
+		pendingNonce := int(pool.pendingState.GetNonce(kkAddr))
+		currentNonce := int(nonce)
+
+		glog.V(logger.Error).Infof("@RD AFTER DEMOTE reset: pending > ",
+			pendingNonce, " cur --> ",
+			currentNonce, "pending length: ", len(pool.pending))
 	}
 	// Check the queue and move transactions over to the pending if possible
 	// or remove those that have become invalid
@@ -688,13 +731,13 @@ func (pool *TxPool) demoteUnexecutables() {
 	for addr, list := range pool.pending {
 		nonce := state.GetNonce(addr)
 
-		glog.V(logger.Error).Infof("@RD =======> demoteUnexecutables: ", pool.pendingState.GetNonce(addr),
+		glog.V(logger.Error).Infof("@RD =======> demoteUnexecutables: ", addr.Hex(), pool.pendingState.GetNonce(addr),
 			nonce)
 
 		// Drop all transactions that are deemed too old (low nonce)
 		for _, tx := range list.Forward(nonce) {
 			//if glog.V(logger.Core) {
-				glog.Infof("Removed old pending transaction: %v", tx)
+				glog.Infof("@RD Removed old pending transaction: %v", tx)
 
 			//}
 			glog.V(logger.Error).Infof("@RD Removed old pending transaction, nonce : ", nonce)
