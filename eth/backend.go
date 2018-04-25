@@ -104,6 +104,7 @@ type Config struct {
 
 	SelfId int
 	DataDir string
+	DMCKIPCDir string
 }
 
 type LesServer interface {
@@ -147,6 +148,7 @@ type Ethereum struct {
 	netRPCService *ethapi.PublicNetAPI
 
 	selfId int
+	dmckipcdir string
 }
 
 func (s *Ethereum) AddLesServer(ls LesServer) {
@@ -169,7 +171,8 @@ func New(ctx *node.ServiceContext, config *Config) (*Ethereum, error) {
 		return nil, err
 	}
 
-	glog.V(logger.Error).Infoln("@RD backend new called with datadir ", config.DataDir)
+	glog.V(logger.Error).Infoln("@RD backend new called with datadir,dmckipcdir, and selfid ", config.DataDir,
+		config.DMCKIPCDir, config.SelfId)
 
 	last1  := config.DataDir[len(config.DataDir)-1:]
 	selfID, _ := strconv.Atoi(last1)
@@ -190,7 +193,8 @@ func New(ctx *node.ServiceContext, config *Config) (*Ethereum, error) {
 		MinerThreads:   config.MinerThreads,
 		AutoDAG:        config.AutoDAG,
 		solcPath:       config.SolcPath,
-		selfId: config.SelfId,
+		selfId: 		config.SelfId,
+		dmckipcdir: 	config.DMCKIPCDir,
 	}
 
 	if err := upgradeChainDatabase(chainDb); err != nil {
@@ -251,8 +255,13 @@ func New(ctx *node.ServiceContext, config *Config) (*Ethereum, error) {
 		}
 	}
 
+	dmckConf := &DMCKConfig{
+		dmckipc: config.DMCKIPCDir,
+		selfId: config.SelfId,
+	}
+
 	if eth.protocolManager, err = NewProtocolManager(eth.chainConfig, config.FastSync, config.NetworkId, maxPeers, eth.eventMux, eth.txPool, eth.pow, eth.blockchain, chainDb,
-		selfID); err != nil {
+		selfID, dmckConf); err != nil {
 		return nil, err
 	}
 	eth.miner = miner.New(eth, eth.chainConfig, eth.EventMux(), eth.pow)

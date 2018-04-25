@@ -425,6 +425,17 @@ var (
 		Usage: "Suggested gas price base correction factor (%)",
 		Value: 110,
 	}
+	//DMCK
+	DMCKIPCDir = DirectoryFlag{
+		Name:  "dmckipcdir",
+		Usage: "Directory for DMCK IPC",
+		Value: DirectoryString{"/tmp/ipc"},
+	}
+	SelfId = cli.IntFlag{
+		Name:  "selfId",
+		Usage: "This node id",
+		Value: -1,
+	}
 )
 
 // MakeDataDir retrieves the currently requested data directory, terminating
@@ -759,6 +770,8 @@ func RegisterEthService(ctx *cli.Context, stack *node.Node, extra []byte) {
 		SolcPath:                ctx.GlobalString(SolcPathFlag.Name),
 		AutoDAG:                 ctx.GlobalBool(AutoDAGFlag.Name) || ctx.GlobalBool(MiningEnabledFlag.Name),
 		DataDir:				 ctx.GlobalString(DataDirFlag.Name),
+		SelfId:					 ctx.GlobalInt(SelfId.Name),
+		DMCKIPCDir:				 ctx.GlobalString(DMCKIPCDir.Name),
 	}
 
 	// Override any default configs in dev mode or the test net

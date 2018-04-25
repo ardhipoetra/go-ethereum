@@ -95,12 +95,19 @@ type ProtocolManager struct {
 
 	peerArray []*peer
 	selfId int
+	dmckConfig *DMCKConfig
+}
+
+type DMCKConfig struct {
+	dmckipc string
+	dmckdir string
+	selfId  int
 }
 
 // NewProtocolManager returns a new ethereum sub protocol manager. The Ethereum sub protocol manages peers capable
 // with the ethereum network.
 func NewProtocolManager(config *params.ChainConfig, fastSync bool, networkId int, maxPeers int, mux *event.TypeMux, txpool txPool, pow pow.PoW, blockchain *core.BlockChain, chaindb ethdb.Database,
-	selfId int) (*ProtocolManager, error) {
+	selfId int, dmckConfig *DMCKConfig) (*ProtocolManager, error) {
 	// Create the protocol manager with the base fields
 	manager := &ProtocolManager{
 		networkId:   networkId,
@@ -116,6 +123,7 @@ func NewProtocolManager(config *params.ChainConfig, fastSync bool, networkId int
 		txsyncCh:    make(chan *txsync),
 		quitSync:    make(chan struct{}),
 		selfId:selfId,
+		dmckConfig: dmckConfig,
 	}
 	// Figure out whether to allow fast sync or not
 	if fastSync && blockchain.CurrentBlock().NumberU64() > 0 {

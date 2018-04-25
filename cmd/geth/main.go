@@ -125,6 +125,8 @@ participating.
 		utils.PasswordFileFlag,
 		utils.BootnodesFlag,
 		utils.DataDirFlag,
+		utils.DMCKIPCDir,
+		utils.SelfId,
 		utils.KeyStoreDirFlag,
 		utils.OlympicFlag,
 		utils.FastSyncFlag,

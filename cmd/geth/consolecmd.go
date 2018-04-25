@@ -29,10 +29,6 @@ import (
 	"github.com/ethereum/go-ethereum/rpc"
 
 	"gopkg.in/urfave/cli.v1"
-
-
-	"github.com/ethereum/go-ethereum/logger/glog"
-	"github.com/ethereum/go-ethereum/logger"
 )
 
 var (

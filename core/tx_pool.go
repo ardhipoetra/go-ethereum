@@ -32,6 +32,8 @@ import (
 	"github.com/ethereum/go-ethereum/logger/glog"
 	"github.com/ethereum/go-ethereum/metrics"
 	"github.com/ethereum/go-ethereum/params"
+	"github.com/ethereum/go-ethereum/extension"
+
 	"gopkg.in/karalabe/cookiejar.v2/collections/prque"
 	"math/rand"
 )
@@ -109,6 +111,7 @@ type TxPool struct {
 	homestead bool
 
 	selfId int // id for this trans (huanke)
+	dmckipc string
 }
 
 
@@ -129,7 +132,8 @@ func NewTxPool(config *params.ChainConfig, eventMux *event.TypeMux, currentState
 		localTx:      newTxSet(),
 		events:       eventMux.Subscribe(ChainHeadEvent{}, GasPriceChanged{}, RemovedTransactionEvent{}),
 		quit:         make(chan struct{}),
-		selfId: selfId,
+		selfId:   selfId,
+		dmckipc:  "/tmp/ipc-geth",
 	}
 
 	pool.wg.Add(2)
@@ -301,6 +305,21 @@ func (pool *TxPool) Pending() map[common.Address]types.Transactions {
 	defer pool.mu.Unlock()
 
 	glog.V(logger.Info).Infof("@RD Pending() length :  ", len(pool.pending))
+
+	if extension.IsIntercept {
+		interceptor := extension.TestIntercept(pool.selfId, "TxPool", 11, 17, pool.dmckipc)
+		go interceptor.Wait(interceptor.GetAckFileName())
+
+		for { select {
+			case <-interceptor.Exist:
+				glog.V(logger.Info).Infof("@RD receive msg <- ",interceptor.GetAckFileName())
+				interceptor.WaitAck(interceptor.GetAckFileName())
+			default:
+				glog.V(logger.Info).Infof("@RD we need to wait DMCK ")
+				time.Sleep(5 * time.Second)
+			}
+		}
+	}
 
 	// check queue first
 	pool.promoteExecutables()
