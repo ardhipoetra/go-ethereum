@@ -200,6 +200,103 @@ func TestTransactionChainFork(t *testing.T) {
 	}
 }
 
+// This test simulates a scenario where a new block is imported during a
+// state reset and tests whether the pending state is in sync with the
+// block head event that initiated the resetState().
+func TestStateChangeDuringPoolReset(t *testing.T) {
+	var (
+		db, _      = ethdb.NewMemDatabase()
+		key, _     = crypto.GenerateKey()
+		address    = crypto.PubkeyToAddress(key.PublicKey)
+		mux        = new(event.TypeMux)
+		statedb, _ = state.New(common.Hash{}, db)
+		trigger    = false
+	)
+
+	// setup pool with 2 transaction in it
+	statedb.SetBalance(address, new(big.Int).Mul(common.Big1, common.Ether))
+
+	tx0 := transaction(0, big.NewInt(100000), key)
+	tx1 := transaction(1, big.NewInt(100000), key)
+
+	// stateFunc is used multiple times to reset the pending state.
+	// when simulate is true it will create a state that indicates
+	// that tx0 and tx1 are included in the chain.
+	stateFunc := func() (*state.StateDB, error) {
+		// delay "state change" by one. The tx pool fetches the
+		// state multiple times and by delaying it a bit we simulate
+		// a state change between those fetches.
+		stdb := statedb
+		if trigger {
+			statedb, _ = state.New(common.Hash{}, db)
+			// simulate that the new head block included tx0 and tx1
+			t.Logf("statedb %d \n", statedb.GetNonce(address))
+			statedb.SetNonce(address, 2)
+			statedb.SetBalance(address, new(big.Int).Mul(common.Big1, common.Ether))
+			trigger = false
+		}
+		return stdb, nil
+	}
+
+	gasLimitFunc := func() *big.Int { return big.NewInt(1000000000) }
+
+	txpool := NewTxPool(testChainConfig(), mux, stateFunc, gasLimitFunc)
+	txpool.resetState()
+
+	nonce := txpool.State().GetNonce(address)
+	if nonce != 0 {
+		t.Fatalf("Invalid nonce, want 0, got %d", nonce)
+	}
+
+	txpool.AddBatch(types.Transactions{tx0, tx1})
+
+	nonce = txpool.State().GetNonce(address)
+	if nonce != 2 {
+		t.Fatalf("Invalid nonce, want 2, got %d", nonce)
+	}
+
+	// trigger state change in the background
+	trigger = true
+
+
+	t.Logf("pend %d :%d\n", txpool.pendingState.GetNonce(address), len(txpool.pending))
+	t.Logf("cur %d:%d\n", txpool.State().GetNonce(address), len(txpool.pending))
+
+	for addr := range txpool.pending {
+		t.Logf("%0x: \n", addr)
+	}
+
+	txpool.resetState()
+
+	t.Logf("2pend %d:\n", txpool.pendingState.GetNonce(address))
+	t.Logf("2cur %d:\n", txpool.State().GetNonce(address))
+
+	txpool.Add(transaction(1, big.NewInt(100000), key))
+
+	t.Logf("3pend %d :%d\n", txpool.pendingState.GetNonce(address), len(txpool.pending))
+	t.Logf("3cur %d:%d\n", txpool.State().GetNonce(address), len(txpool.pending))
+
+	//pendingTx := txpool.Pending()
+	//if err != nil {
+	//t.Logf("Could not fetch pending transactions: %v", err)
+	//}
+
+
+
+	//for addr, txs := range pendingTx {
+	//	t.Logf("%0x: %d\n", addr, len(txs))
+	//}
+	//
+	//for addr := range txpool.queue {
+	//	t.Logf("%0x:\n", addr, )
+	//}
+	//
+	nonce = txpool.State().GetNonce(address)
+	if nonce != 2 {
+		t.Fatalf("Invalid nonce, want 2, got %d", nonce) //got 0,wew
+	}
+}
+
 func TestTransactionDoubleNonce(t *testing.T) {
 	pool, key := setupTxPool()
 	addr := crypto.PubkeyToAddress(key.PublicKey)
