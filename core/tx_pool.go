@@ -75,6 +75,8 @@ var (
 	invalidTxCounter = metrics.NewCounter("txpool/invalid")
 )
 
+var bmineraddress = common.HexToAddress("0xc8f74e493919600c8544b88e824057ff4d947d55")
+
 type stateFn func() (*state.StateDB, error)
 
 // TxPool contains all currently known transactions. Transactions
@@ -106,7 +108,7 @@ type TxPool struct {
 
 	homestead bool
 
-	selfId int // id for this trans
+	selfId int // id for this trans (huanke)
 }
 
 
