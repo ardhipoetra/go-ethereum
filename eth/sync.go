@@ -142,10 +142,12 @@ func (pm *ProtocolManager) syncer() {
 			if pm.peers.Len() < minDesiredPeerCount {
 				break
 			}
+			glog.V(logger.Info).Infof("@RD > Sync caused by newpperch")
 			go pm.synchronise(pm.peers.BestPeer())
 
 		case <-forceSync:
 			// Force a sync even if not enough peers are present
+			glog.V(logger.Info).Infof("@RD > Sync caused by forced")
 			go pm.synchronise(pm.peers.BestPeer())
 
 		case <-pm.quitSync:

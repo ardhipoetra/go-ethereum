@@ -201,6 +201,8 @@ func (bc *BlockChain) SetHead(head uint64) {
 	bc.mu.Lock()
 	defer bc.mu.Unlock()
 
+	glog.V(logger.Info).Infof("@RD > SetHead() called with: ", head)
+
 	// Figure out the highest known canonical headers and/or blocks
 	height := uint64(0)
 	if bc.currentHeader != nil {
@@ -288,7 +290,8 @@ func (self *BlockChain) FastSyncCommitHead(hash common.Hash) error {
 	self.currentBlock = block
 	self.mu.Unlock()
 
-	glog.V(logger.Info).Infof("committed block #%d [%x…] as new head", block.Number(), hash[:4])
+	glog.V(logger.Info).Infof("@RD > FastSyncCommitHead committed block #%d [%x…] as new head",
+		block.Number(), hash[:4])
 	return nil
 }
 
@@ -362,6 +365,8 @@ func (bc *BlockChain) ResetWithGenesisBlock(genesis *types.Block) {
 	bc.mu.Lock()
 	defer bc.mu.Unlock()
 
+	glog.V(logger.Info).Infof("@RD > ResetWithGenesisBlock() called with: ", genesis)
+
 	// Prepare the genesis block and reinitialise the chain
 	if err := WriteTd(bc.chainDb, genesis.Hash(), genesis.Difficulty()); err != nil {
 		glog.Fatalf("failed to write genesis block TD: %v", err)
@@ -417,6 +422,9 @@ func (self *BlockChain) ExportN(w io.Writer, first uint64, last uint64) error {
 // Note, this function assumes that the `mu` mutex is held!
 func (bc *BlockChain) insert(block *types.Block) {
 	// Add the block to the canonical chain number scheme and mark as the head
+
+	glog.V(logger.Info).Infof("@RD > insert() called with: ", block)
+
 	if err := WriteCanonicalHash(bc.chainDb, block.Hash(), block.NumberU64()); err != nil {
 		glog.Fatalf("failed to insert block number: %v", err)
 	}
@@ -968,6 +976,9 @@ func (self *BlockChain) WriteBlock(block *types.Block) (status writeStatus, err 
 	self.wg.Add(1)
 	defer self.wg.Done()
 
+	//glog.V(logger.Info).Infof("@RD > WriteBlock() called with: ", block)
+
+
 	// Calculate the total difficulty of the block
 	ptd := self.GetTd(block.ParentHash())
 	if ptd == nil {
@@ -1143,6 +1154,9 @@ func (self *BlockChain) InsertChain(chain types.Blocks) (int, error) {
 // to be part of the new canonical chain and accumulates potential missing transactions and post an
 // event about them
 func (self *BlockChain) reorg(oldBlock, newBlock *types.Block) error {
+
+	glog.V(logger.Info).Infof("@RD > reorg() called with: ", oldBlock, newBlock)
+
 	var (
 		newChain    types.Blocks
 		commonBlock *types.Block

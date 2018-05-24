@@ -638,6 +638,7 @@ func (pm *ProtocolManager) handleMsg(p *peer) error {
 			p.SetTd(request.TD)
 			td := pm.blockchain.GetTd(pm.blockchain.CurrentBlock().Hash())
 			if request.TD.Cmp(new(big.Int).Add(td, request.Block.Difficulty())) > 0 {
+				glog.V(logger.Info).Infof("@RD > Sync caused by totaldifficulty differnce & NewBlockMsg")
 				go pm.synchronise(p)
 			}
 		}

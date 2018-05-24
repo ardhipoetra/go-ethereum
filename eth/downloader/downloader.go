@@ -64,8 +64,8 @@ var (
 	fsHeaderCheckFrequency = 100  // Verification frequency of the downloaded headers during fast sync
 	fsHeaderSafetyNet      = 2048 // Number of headers to discard in case a chain violation is detected
 	fsHeaderForceVerify    = 24   // Number of headers to verify before and after the pivot to accept it
-	fsPivotInterval        = 512  // Number of headers out of which to randomize the pivot point
-	fsMinFullBlocks        = 1024 // Number of blocks to retrieve fully even in fast sync
+	fsPivotInterval        = 5  // Number of headers out of which to randomize the pivot point
+	fsMinFullBlocks        = 1 // Number of blocks to retrieve fully even in fast sync
 )
 
 var (
@@ -405,6 +405,8 @@ func (d *Downloader) syncWithPeer(p *peer, hash common.Hash, td *big.Int) (err e
 			pivot = latest
 
 		case FastSync:
+			glog.V(logger.Debug).Infof("Before setpivot : pivot #%d origin #%d latest %d",
+				pivot, origin, latest)
 			// Calculate the new fast/slow sync pivot point
 			pivotOffset, err := rand.Int(rand.Reader, big.NewInt(int64(fsPivotInterval)))
 			if err != nil {
@@ -421,7 +423,8 @@ func (d *Downloader) syncWithPeer(p *peer, hash common.Hash, td *big.Int) (err e
 					origin = 0
 				}
 			}
-			glog.V(logger.Debug).Infof("Fast syncing until pivot block #%d", pivot)
+			glog.V(logger.Debug).Infof("Fast syncing until pivot block #%d with origin #%d",
+				pivot, origin)
 		}
 		d.queue.Prepare(origin+1, d.mode, pivot)
 
@@ -1417,6 +1420,8 @@ func (d *Downloader) fetchParts(errCancel error, deliveryCh chan dataPack, deliv
 
 				case errInvalidChain:
 					// The hash chain is invalid (blocks are not ordered properly), abort
+					glog.V(logger.Info).Infof("@RD > errInvalidChain : peer %s. %s delivery",
+						peer, strings.ToLower(kind))
 					return err
 
 				case errNoFetchesPending:
