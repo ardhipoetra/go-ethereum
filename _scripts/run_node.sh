@@ -12,6 +12,8 @@ ipc_dir=""
 if [ -n "$2" ]; then
   if [ "$2" == "mine" ]; then
     opt="$opt --mine --minerthreads=1"
+  elif [ "$2" == "fast" ]; then
+    opt="$opt --fast"
   else
     log_dir=$2
   fi
@@ -34,7 +36,7 @@ echo "Option : $opt"
 echo "Data dir : $datadir"
 
 set -o xtrace
-geth $opt --networkid=1719 --port=3210$node_id --nodiscover --fast\
+geth $opt --networkid=1719 --port=3210$node_id --nodiscover \
     --verbosity=6 --vmodule="p2p=2" --genesis $ETH_PATH/head/genesis.json \
  --datadir=$datadir --identity="node$node_id"  --rpc --rpcport=990$node_id 2> "$log_dir/$curdate.log"
 

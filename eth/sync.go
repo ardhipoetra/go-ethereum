@@ -125,6 +125,8 @@ func (pm *ProtocolManager) txsyncLoop() {
 	}
 }
 
+var syncCount = 0
+
 // syncer is responsible for periodically synchronising with the network, both
 // downloading hashes and blocks as well as handling the announcement handler.
 func (pm *ProtocolManager) syncer() {
@@ -142,13 +144,20 @@ func (pm *ProtocolManager) syncer() {
 			if pm.peers.Len() < minDesiredPeerCount {
 				break
 			}
-			glog.V(logger.Info).Infof("@RD > Sync caused by newpperch")
-			go pm.synchronise(pm.peers.BestPeer())
+			syncCount++
+			var peer = pm.peers.BestPeerC(syncCount)
+			glog.V(logger.Info).Infof("@RD > Sync caused by newpperch. From %s. Count sync : %d",
+				peer, syncCount)
+			go pm.synchronise(peer)
+
 
 		case <-forceSync:
 			// Force a sync even if not enough peers are present
-			glog.V(logger.Info).Infof("@RD > Sync caused by forced")
-			go pm.synchronise(pm.peers.BestPeer())
+			syncCount++
+			var peer = pm.peers.BestPeerC(syncCount)
+			glog.V(logger.Info).Infof("@RD > Sync caused by forced. From %s. Count sync : %d",
+				peer, syncCount)
+			go pm.synchronise(peer)
 
 		case <-pm.quitSync:
 			return

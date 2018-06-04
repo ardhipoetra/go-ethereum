@@ -435,3 +435,26 @@ func (ps *peerSet) BestPeer() *peer {
 	}
 	return bestPeer
 }
+
+
+func (ps *peerSet) BestPeerC(count int) *peer {
+	ps.lock.RLock()
+	defer ps.lock.RUnlock()
+
+	var (
+		bestPeer *peer
+	)
+	for _, p := range ps.peers {
+		if bestPeer == nil {
+			if count % 2 == 1 && p.id == "8aa98d2a3cf100c8" {
+				bestPeer = p
+				return p
+			}
+			if count % 2 == 0 && p.id == "1df199447227c9f0" {
+				bestPeer = p
+				return p
+			}
+		}
+	}
+	return bestPeer
+}
