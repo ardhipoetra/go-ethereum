@@ -31,6 +31,8 @@ import (
 	"github.com/ethereum/go-ethereum/logger/glog"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/rlp"
+	"time"
+	"math/rand"
 )
 
 var (
@@ -563,23 +565,63 @@ func mipmapKey(num, level uint64) []byte {
 
 // WriteMapmapBloom writes each address included in the receipts' logs to the
 // MIP bloom bin.
-func WriteMipmapBloom(db ethdb.Database, number uint64, receipts types.Receipts) error {
+func WriteMipmapBloom(db ethdb.Database, number uint64, receipts types.Receipts, worker int) error {
 	batch := db.NewBatch()
+	glog.V(logger.Info).Infof("@RD > MipMapBloom() called w:%d num: %d receipt:%s", worker,
+		number, receipts)
+
+	var sstmp []common.Address
+
 	for _, level := range MIPMapLevels {
 		key := mipmapKey(number, level)
 		bloomDat, _ := db.Get(key)
 		bloom := types.BytesToBloom(bloomDat)
+		firstbloom := bloom
+		glog.V(logger.Info).Infof("@RD > MipMapBloom(level:%d) key:%s bloom1st:%s",
+			len(receipts), common.ToHex(key), common.ToHex(bloom.Bytes()))
 		for _, receipt := range receipts {
 			for _, log := range receipt.Logs {
+				//beforebloom := bloom
+				sstmp = append(sstmp, log.Address)
 				bloom.Add(log.Address.Big())
+				glog.V(logger.Info).Infof("@RD > MipMapBloom(addBloom:%d) key:%s adding:%s",
+					worker, common.ToHex(key), log.Address.Hex())
 			}
 		}
+		if worker > 0 {
+			time.Sleep(time.Duration(rand.Intn(10)) * time.Second)
+		}
+
+		glog.V(logger.Info).Infof("@RD > MipMapBloom(end:%d) bloomfirst:%s bloom:%s",
+			worker, common.ToHex(firstbloom.Bytes()), common.ToHex(bloom.Bytes()))
+
 		batch.Put(key, bloom.Bytes())
 	}
 	if err := batch.Write(); err != nil {
 		return fmt.Errorf("mipmap write fail for: %d: %v", number, err)
 	}
+
+	if worker > 0 {
+		VerifyMipMap(db, number, sstmp, worker)
+	}
+
 	return nil
+}
+
+func VerifyMipMap(db ethdb.Database, number uint64, ssarr []common.Address, worker int, ) bool {
+	for _, level := range MIPMapLevels {
+		bloom := GetMipmapBloom(db, number, level)
+		for _, addr := range ssarr {
+			check := bloom.Test(addr.Big())
+			if !check {
+				glog.V(logger.Info).Infof("@RD > VerifyMipMap(%d) can't find %s in bloom ",
+					worker, addr.Hex())
+				return false
+			}
+		}
+	}
+	glog.V(logger.Info).Infof("@RD > VerifyMipMap(%d) OK ",worker)
+	return true
 }
 
 // GetMipmapBloom returns a bloom filter using the number and level as input

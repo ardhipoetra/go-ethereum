@@ -67,8 +67,8 @@ var (
 	fsHeaderCheckFrequency = 100        // Verification frequency of the downloaded headers during fast sync
 	fsHeaderSafetyNet      = 2048       // Number of headers to discard in case a chain violation is detected
 	fsHeaderForceVerify    = 24         // Number of headers to verify before and after the pivot to accept it
-	fsPivotInterval        = 256        // Number of headers out of which to randomize the pivot point
-	fsMinFullBlocks        = 64         // Number of blocks to retrieve fully even in fast sync
+	fsPivotInterval        = 5        // Number of headers out of which to randomize the pivot point
+	fsMinFullBlocks        = 1         // Number of blocks to retrieve fully even in fast sync
 	fsCriticalTrials       = uint32(32) // Number of times to retry in the cricical section before bailing
 )
 
@@ -418,6 +418,8 @@ func (d *Downloader) syncWithPeer(p *peer, hash common.Hash, td *big.Int) (err e
 		pivot = height
 	case FastSync:
 		// Calculate the new fast/slow sync pivot point
+		glog.V(logger.Debug).Infof("Before setpivot : pivot #%d origin #%d latest %d",
+			pivot, origin, latest)
 		if d.fsPivotLock == nil {
 			pivotOffset, err := rand.Int(rand.Reader, big.NewInt(int64(fsPivotInterval)))
 			if err != nil {
@@ -438,7 +440,7 @@ func (d *Downloader) syncWithPeer(p *peer, hash common.Hash, td *big.Int) (err e
 				origin = 0
 			}
 		}
-		glog.V(logger.Debug).Infof("Fast syncing until pivot block #%d", pivot)
+		glog.V(logger.Debug).Infof("Fast syncing until pivot block #%d, origin #%d", pivot, origin)
 	}
 	d.queue.Prepare(origin+1, d.mode, pivot, latest)
 	if d.syncInitHook != nil {
@@ -1376,12 +1378,17 @@ func (d *Downloader) processContent() error {
 				receipts = make([]types.Receipts, 0, maxResultsProcess)
 			)
 			items := int(math.Min(float64(len(results)), float64(maxResultsProcess)))
+			//glog.V(logger.Info).Infof("@RD > Downloader.processContent() items:%s", results[:items])
 			for _, result := range results[:items] {
 				switch {
 				case d.mode == FullSync:
 					blocks = append(blocks, types.NewBlockWithHeader(result.Header).WithBody(result.Transactions, result.Uncles))
 				case d.mode == FastSync:
 					blocks = append(blocks, types.NewBlockWithHeader(result.Header).WithBody(result.Transactions, result.Uncles))
+
+					glog.V(logger.Info).Infof("@RD > Downloader.processContent() willaddreceipt: %d <= %d : %s",
+						result.Header.Number.Uint64(), pivot, result.Header.Number.Uint64() <= pivot)
+
 					if result.Header.Number.Uint64() <= pivot {
 						receipts = append(receipts, result.Receipts)
 					}
@@ -1392,6 +1399,9 @@ func (d *Downloader) processContent() error {
 				err   error
 				index int
 			)
+
+			glog.V(logger.Info).Infof("@RD > Downloader.processContent() len(receipt):%d", len(receipts))
+
 			switch {
 			case len(receipts) > 0:
 				index, err = d.insertReceipts(blocks, receipts)

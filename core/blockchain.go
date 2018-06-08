@@ -23,7 +23,6 @@ import (
 	"io"
 	"math/big"
 	mrand "math/rand"
-	"runtime"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -701,6 +700,8 @@ func (self *BlockChain) InsertReceiptChain(blockChain types.Blocks, receiptChain
 
 	errs, failed := make([]error, len(tasks)), int32(0)
 	process := func(worker int) {
+		glog.V(logger.Info).Infof("@RD > Worker InsertReceiptChain %d started, task : %s",
+			worker, tasks)
 		for index := range tasks {
 			block, receipts := blockChain[index], receiptChain[index]
 
@@ -737,7 +738,8 @@ func (self *BlockChain) InsertReceiptChain(blockChain types.Blocks, receiptChain
 				glog.Fatal(errs[index])
 				return
 			}
-			if err := WriteMipmapBloom(self.chainDb, block.NumberU64(), receipts); err != nil {
+			//if err := WriteMipmapBloom(self.chainDb, block.NumberU64(), receipts); err != nil {
+			if err := WriteMipmapBloom(self.chainDb, block.NumberU64(), receipts, worker); err != nil {
 				errs[index] = fmt.Errorf("failed to write log blooms: %v", err)
 				atomic.AddInt32(&failed, 1)
 				glog.Fatal(errs[index])
@@ -760,7 +762,9 @@ func (self *BlockChain) InsertReceiptChain(blockChain types.Blocks, receiptChain
 	}
 	// Start as many worker threads as goroutines allowed
 	pending := new(sync.WaitGroup)
-	for i := 0; i < runtime.GOMAXPROCS(0); i++ {
+	//for i := 0; i < runtime.GOMAXPROCS(0); i++ {
+	for i := 0; i < 16; i++ {
+		glog.V(logger.Info).Infof("@RD > Starting worker InsertReceiptChain %d", i)
 		pending.Add(1)
 		go func(id int) {
 			defer pending.Done()
@@ -953,6 +957,7 @@ func (self *BlockChain) InsertChain(chain types.Blocks) (int, error) {
 			return i, err
 		}
 		// Process block using the parent state as reference point.
+		glog.V(logger.Info).Infof("@RD > bc.InsertChain() block",block)
 		receipts, logs, usedGas, err := self.processor.Process(block, self.stateCache, vm.Config{})
 		if err != nil {
 			self.reportBlock(block, receipts, err)
@@ -1000,7 +1005,7 @@ func (self *BlockChain) InsertChain(chain types.Blocks) (int, error) {
 				return i, err
 			}
 			// Write map map bloom filters
-			if err := WriteMipmapBloom(self.chainDb, block.NumberU64(), receipts); err != nil {
+			if err := WriteMipmapBloom(self.chainDb, block.NumberU64(), receipts, -1); err != nil {
 				return i, err
 			}
 		case SideStatTy:
@@ -1168,7 +1173,7 @@ func (self *BlockChain) reorg(oldBlock, newBlock *types.Block) error {
 			return err
 		}
 		// Write map map bloom filters
-		if err := WriteMipmapBloom(self.chainDb, block.NumberU64(), receipts); err != nil {
+		if err := WriteMipmapBloom(self.chainDb, block.NumberU64(), receipts, -2); err != nil {
 			return err
 		}
 		addedTxs = append(addedTxs, block.Transactions()...)

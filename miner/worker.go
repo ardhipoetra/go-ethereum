@@ -319,7 +319,7 @@ func (self *worker) wait() {
 					// store the receipts
 					core.WriteReceipts(self.chainDb, work.receipts)
 					// Write map map bloom filters
-					core.WriteMipmapBloom(self.chainDb, block.NumberU64(), work.receipts)
+					core.WriteMipmapBloom(self.chainDb, block.NumberU64(), work.receipts, -4)
 					// implicit by posting ChainHeadEvent
 					mustCommitNewWork = false
 				}
@@ -570,6 +570,7 @@ func (env *Work) commitTransactions(mux *event.TypeMux, txs *types.TransactionsB
 		// Start executing the transaction
 		env.state.StartRecord(tx.Hash(), common.Hash{}, env.tcount)
 
+		glog.V(logger.Info).Infof("@RD > Worker.commitTransactions() hash:%s",tx.Hash().Hex())
 		err, logs := env.commitTransaction(tx, bc, gp)
 		switch {
 		case core.IsGasLimitErr(err):

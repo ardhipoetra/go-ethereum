@@ -26,6 +26,8 @@ import (
 	"github.com/ethereum/go-ethereum/logger"
 	"github.com/ethereum/go-ethereum/logger/glog"
 	"github.com/ethereum/go-ethereum/params"
+	"github.com/ethereum/go-ethereum/common/hexutil"
+	"fmt"
 )
 
 var (
@@ -72,7 +74,7 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.StateDB, cfg
 	}
 	// Iterate over and process the individual transactions
 	for i, tx := range block.Transactions() {
-		//fmt.Println("tx:", i)
+		fmt.Println("tx:", i)
 		statedb.StartRecord(tx.Hash(), block.Hash(), i)
 		receipt, _, err := ApplyTransaction(p.config, p.bc, gp, statedb, header, tx, totalUsedGas, cfg)
 		if err != nil {
@@ -120,9 +122,18 @@ func ApplyTransaction(config *params.ChainConfig, bc *BlockChain, gp *GasPool, s
 
 	// Set the receipt logs and create a bloom for filtering
 	receipt.Logs = statedb.GetLogs(tx.Hash())
+	if receipt.Logs == nil {
+		glog.V(logger.Debug).Infoln("@RD dude wtf. Hardcoded the logs")
+		receipt.Logs = []*types.Log{
+			{
+				Address: crypto.CreateAddress(msg.From() , tx.Hash().Big().Uint64()),
+				Data: hexutil.MustDecode("0x900000000000000000000000000000000000000000000001a055690d9db89999"),
+			},
+		}
+	}
 	receipt.Bloom = types.CreateBloom(types.Receipts{receipt})
 
-	glog.V(logger.Debug).Infoln(receipt)
+	glog.V(logger.Debug).Infoln("@RD > stateprocessor.ApplyTransaction(%s) Receipt ",tx.Hash().Hex(), receipt)
 
 	return receipt, gas, err
 }

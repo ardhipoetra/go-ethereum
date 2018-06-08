@@ -28,6 +28,8 @@ import (
 	"github.com/ethereum/go-ethereum/event"
 	"github.com/ethereum/go-ethereum/params"
 	"github.com/ethereum/go-ethereum/pow"
+	"github.com/ethereum/go-ethereum/logger/glog"
+	"github.com/ethereum/go-ethereum/logger"
 )
 
 /*
@@ -107,6 +109,7 @@ func (b *BlockGen) AddTx(tx *types.Transaction) {
 	if b.gasPool == nil {
 		b.SetCoinbase(common.Address{})
 	}
+	glog.V(logger.Info).Infof("@RD > chainmakers.AddTx() hash:%s",tx.Hash().Hex())
 	b.statedb.StartRecord(tx.Hash(), common.Hash{}, len(b.txs))
 	receipt, _, err := ApplyTransaction(b.config, nil, b.gasPool, b.statedb, b.header, tx, b.header.GasUsed, vm.Config{})
 	if err != nil {
