@@ -790,6 +790,7 @@ func (bc *BlockChain) WriteBlockAndState(block *types.Block, receipts []*types.R
 	// Calculate the total difficulty of the block
 	ptd := bc.GetTd(block.ParentHash(), block.NumberU64()-1)
 	if ptd == nil {
+		log.Info("@RD > ret ErrUnknownAncestor ","id", 2)
 		return NonStatTy, consensus.ErrUnknownAncestor
 	}
 	// Make sure no inconsistent state is leaked during insertion
@@ -797,7 +798,7 @@ func (bc *BlockChain) WriteBlockAndState(block *types.Block, receipts []*types.R
 	defer bc.mu.Unlock()
 
 	if bc.HasBlock(block.Hash(), block.NumberU64()) {
-		log.Trace("Block existed", "hash", block.Hash())
+		log.Info("@RD > HasBlock existed", "hash", block.Hash())
 		return
 	}
 
@@ -946,6 +947,10 @@ func (bc *BlockChain) insertChain(chain types.Blocks) (int, []interface{}, []*ty
 				continue
 			}
 
+			if err == consensus.ErrUnknownAncestor {
+				log.Info("@RD > ret ErrUnknownAncestor ","id", 3, "contain", bc.futureBlocks.Contains(block.ParentHash()))
+			}
+
 			if err == consensus.ErrUnknownAncestor && bc.futureBlocks.Contains(block.ParentHash()) {
 				bc.futureBlocks.Add(block.Hash(), block)
 				stats.queued++
@@ -980,6 +985,7 @@ func (bc *BlockChain) insertChain(chain types.Blocks) (int, []interface{}, []*ty
 			return i, events, coalescedLogs, err
 		}
 		// Write the block to the chain and get the status.
+		log.Info("@RD > WriteBlockAndState called in", "blockchain.go", 988)
 		status, err := bc.WriteBlockAndState(block, receipts, state)
 		if err != nil {
 			return i, events, coalescedLogs, err

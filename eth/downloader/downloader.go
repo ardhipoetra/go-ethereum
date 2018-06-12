@@ -64,8 +64,8 @@ var (
 	fsHeaderCheckFrequency = 100        // Verification frequency of the downloaded headers during fast sync
 	fsHeaderSafetyNet      = 2048       // Number of headers to discard in case a chain violation is detected
 	fsHeaderForceVerify    = 24         // Number of headers to verify before and after the pivot to accept it
-	fsPivotInterval        = 256        // Number of headers out of which to randomize the pivot point
-	fsMinFullBlocks        = 64         // Number of blocks to retrieve fully even in fast sync
+	fsPivotInterval        = 20        // Number of headers out of which to randomize the pivot point
+	fsMinFullBlocks        = 1         // Number of blocks to retrieve fully even in fast sync
 	fsCriticalTrials       = uint32(32) // Number of times to retry in the cricical section before bailing
 )
 
@@ -456,6 +456,9 @@ func (d *Downloader) syncWithPeer(p *peerConnection, hash common.Hash, td *big.I
 			pivot = d.fsPivotLock.Number.Uint64()
 		}
 		// If the point is below the origin, move origin back to ensure state download
+
+		log.Info("@RD > pivot found and origin", "pivot", pivot, "origin", origin)
+
 		if pivot < origin {
 			if pivot > 0 {
 				origin = pivot - 1
@@ -463,7 +466,7 @@ func (d *Downloader) syncWithPeer(p *peerConnection, hash common.Hash, td *big.I
 				origin = 0
 			}
 		}
-		log.Debug("Fast syncing until pivot block", "pivot", pivot)
+		log.Info("@RD > Fast syncing until pivot block", "pivot", pivot)
 	}
 	d.queue.Prepare(origin+1, d.mode, pivot, latest)
 	if d.syncInitHook != nil {
@@ -602,7 +605,7 @@ func (d *Downloader) findAncestor(p *peerConnection, height uint64) (uint64, err
 	// Figure out the valid ancestor range to prevent rewrite attacks
 	floor, ceil := int64(-1), d.lightchain.CurrentHeader().Number.Uint64()
 
-	p.log.Debug("Looking for common ancestor", "local", ceil, "remote", height)
+	p.log.Info("@RD > Looking for common ancestor", "local", ceil, "remote", height)
 	if d.mode == FullSync {
 		ceil = d.blockchain.CurrentBlock().NumberU64()
 	} else if d.mode == FastSync {
@@ -1331,6 +1334,7 @@ func (d *Downloader) processFullSyncContent() error {
 		if d.chainInsertHook != nil {
 			d.chainInsertHook(results)
 		}
+		log.Info("@RD > importBlockResults called in processFullSyncContent", "downloader.go", 1337)
 		if err := d.importBlockResults(results); err != nil {
 			return err
 		}
@@ -1394,10 +1398,12 @@ func (d *Downloader) processFastSyncContent(latest *types.Header) error {
 		}
 		if P != nil {
 			stateSync.Cancel()
+			log.Info("@RD > stateSync cancelled", "downloader.go", 1401)
 			if err := d.commitPivotBlock(P); err != nil {
 				return err
 			}
 		}
+		log.Info("@RD > importBlockResults called in processFastSyncContent", "downloader.go", 1406)
 		if err := d.importBlockResults(afterP); err != nil {
 			return err
 		}

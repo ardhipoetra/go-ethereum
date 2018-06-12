@@ -32,6 +32,7 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/params"
 	set "gopkg.in/fatih/set.v0"
+	"github.com/ethereum/go-ethereum/log"
 )
 
 // Ethash proof-of-work protocol constants.
@@ -78,6 +79,7 @@ func (ethash *Ethash) VerifyHeader(chain consensus.ChainReader, header *types.He
 	}
 	parent := chain.GetHeader(header.ParentHash, number-1)
 	if parent == nil {
+		log.Info("@RD > ret ErrUnknownAncestor ","id",8)
 		return consensus.ErrUnknownAncestor
 	}
 	// Sanity checks passed, do a proper verification
@@ -157,6 +159,7 @@ func (ethash *Ethash) verifyHeaderWorker(chain consensus.ChainReader, headers []
 		parent = headers[index-1]
 	}
 	if parent == nil {
+		log.Info("@RD > ret ErrUnknownAncestor ","id",9)
 		return consensus.ErrUnknownAncestor
 	}
 	if chain.GetHeader(headers[index].Hash(), headers[index].Number.Uint64()) != nil {
@@ -499,6 +502,7 @@ func (ethash *Ethash) VerifySeal(chain consensus.ChainReader, header *types.Head
 func (ethash *Ethash) Prepare(chain consensus.ChainReader, header *types.Header) error {
 	parent := chain.GetHeader(header.ParentHash, header.Number.Uint64()-1)
 	if parent == nil {
+		log.Info("@RD > ret ErrUnknownAncestor ","id",10)
 		return consensus.ErrUnknownAncestor
 	}
 	header.Difficulty = CalcDifficulty(chain.Config(), header.Time.Uint64(), parent)
