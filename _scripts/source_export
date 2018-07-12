@@ -1,0 +1,8 @@
+export ETH_PATH='/home/ardhipoetra/git/eth/gik/storage/'
+export GOETH_PROJECT='/home/ardhipoetra/git/eth/gik/src/github.com/ethereum/go-ethereum'
+export PATH=$PATH:$GOETH_PROJECT/build/bin
+export GOPATH='/home/ardhipoetra/git/eth/gik/'
+
+# gvm path
+export GVM_ROOT=/home/ardhipoetra/.gvm
+. $GVM_ROOT/scripts/gvm-default
