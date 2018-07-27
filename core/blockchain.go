@@ -43,7 +43,7 @@ import (
 	"github.com/ethereum/go-ethereum/pow"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/ethereum/go-ethereum/trie"
-	"github.com/hashicorp/golang-lru"
+	"github.com/ethereum/go-ethereum/Godeps/_workspace/src/github.com/hashicorp/golang-lru"
 )
 
 var (
@@ -1067,6 +1067,7 @@ func (self *BlockChain) WriteBlock(block *types.Block) (status writeStatus, err 
 	// If the total difficulty is higher than our known, add it to the canonical chain
 	// Second clause in the if statement reduces the vulnerability to selfish mining.
 	// Please refer to http://www.cs.cornell.edu/~ie53/publications/btcProcFC.pdf
+	glog.Infof("@RD comparing TD local:%d external:%d, val:%s", localTd, externTd, externTd.Cmp(localTd) > 0)
 	if externTd.Cmp(localTd) > 0 || (externTd.Cmp(localTd) == 0 && mrand.Float64() < 0.5) {
 		// Reorganize the chain if the parent is not the head block
 		if block.ParentHash() != self.currentBlock.Hash() {
@@ -1265,12 +1266,18 @@ func (self *BlockChain) reorg(oldBlock, newBlock *types.Block) error {
 		oldStart    = oldBlock
 		newStart    = newBlock
 		deletedTxs  types.Transactions
+
+		oldChain types.Blocks
 	)
+
+	glog.V(logger.Debug).Infof("@RD reorg() called. Old : %s", oldBlock)
+	glog.V(logger.Debug).Infof("@RD reorg() called. New : %s", newBlock)
 
 	// first reduce whoever is higher bound
 	if oldBlock.NumberU64() > newBlock.NumberU64() {
 		// reduce old chain
 		for oldBlock = oldBlock; oldBlock != nil && oldBlock.NumberU64() != newBlock.NumberU64(); oldBlock = self.GetBlock(oldBlock.ParentHash()) {
+			oldChain = append(oldChain, oldBlock)
 			deletedTxs = append(deletedTxs, oldBlock.Transactions()...)
 		}
 	} else {
@@ -1292,6 +1299,8 @@ func (self *BlockChain) reorg(oldBlock, newBlock *types.Block) error {
 			commonBlock = oldBlock
 			break
 		}
+
+		oldChain = append(oldChain, oldBlock)
 		newChain = append(newChain, newBlock)
 		deletedTxs = append(deletedTxs, oldBlock.Transactions()...)
 
@@ -1342,6 +1351,10 @@ func (self *BlockChain) reorg(oldBlock, newBlock *types.Block) error {
 	// Must be posted in a goroutine because of the transaction pool trying
 	// to acquire the chain manager lock
 	go self.eventMux.Post(RemovedTransactionEvent{diff})
+
+	if len(oldChain) > 0 {
+		glog.V(logger.Debug).Infof("@RD Old chain > 0 %d: %s", len(oldChain), oldChain)
+	}
 
 	return nil
 }
