@@ -519,26 +519,29 @@ func (self *worker) commitNewWork() {
 		core.ApplyDAOHardFork(work.state)
 	}
 
-	//---------------------Hack to mine one transaction once -------------------------------
+	//---------------------Hack to mine one transaction once / each block -------------------------------
 	pending:= self.eth.TxPool().Pending()
 	glog.V(logger.Info).Infoln("@RD ==========================> commitNewWork ", len(pending))
 	txCollection:= make([]map[common.Address]types.Transactions, len(pending))
 	for key, value:= range pending {
 		oneTx := make(map[common.Address]types.Transactions)
-		oneTx[key]=value
+		oneTx[key] = types.Transactions{value[0]}
 		txCollection = append(txCollection, oneTx)
-		glog.V(logger.Info).Infoln("@RD  --> ",key, value)
+		glog.V(logger.Info).Infoln("@RD  --> ",key.Hex(), oneTx[key])
 	}
 	if len(pending)>0 {
 		glog.V(logger.Info).Infoln("@RD ===============> commitTransactions ", txCollection[len(pending):][0])
 		txs := types.NewTransactionsByPriceAndNonce(txCollection[len(pending):][0])
 		work.commitTransactions(self.mux, txs, self.gasPrice, self.chain)
 	}else {
+		glog.V(logger.Info).Infoln("@RD ===============> noTransaction from miner")
 		txs := types.NewTransactionsByPriceAndNonce(pending)
 		work.commitTransactions(self.mux, txs, self.gasPrice, self.chain)
 	}
 	//---------------------Hack to mine one transaction once -------------------------------
-	//txs := types.NewTransactionsByPriceAndNonce(self.eth.TxPool().Pending())
+	//pending:= self.eth.TxPool().Pending()
+	//glog.V(logger.Info).Infoln("@RD ==========================> commitNewWork ", len(pending))
+	//txs := types.NewTransactionsByPriceAndNonce(pending)
 	//work.commitTransactions(self.mux, txs, self.gasPrice, self.chain)
 	//----- end of hack
 
@@ -585,8 +588,8 @@ func (self *worker) commitNewWork() {
 	}
 
 	//huanke wants to mine when there are transactions
-	if len(self.eth.TxPool().Pending()) >0 {
-		glog.V(logger.Info).Infoln("@RD **************push(work)", work.Block.Number(), len(self.eth.TxPool().Pending()))
+	if len(pending) > 0 {
+		glog.V(logger.Info).Infoln("@RD **************push(work)", work.Block.Number(), len(pending))
 		self.push(work)
 	}
 	//self.push(work)
