@@ -30,16 +30,16 @@ import (
 )
 
 const (
-	//forceSyncCycle      = 10 * time.Second // Time interval to force syncs, even if few peers are available
+	forceSyncCycle      = 10 * time.Second // Time interval to force syncs, even if few peers are available
 	minDesiredPeerCount = 5                // Amount of peers desired to start syncing
 
 	// This is the target size for the packs of transactions sent by txsyncLoop.
 	// A pack can get larger than this if a single transactions exceeds this size.
-	//txsyncPackSize = 100 * 1024
+	txsyncPackSize = 100 * 1024
 
 	// RD add
-	txsyncPackSize = 1
-	forceSyncCycle      = 1000 * time.Second
+	//txsyncPackSize = 1
+	//forceSyncCycle      = 1000 * time.Second
 )
 
 type txsync struct {
@@ -183,12 +183,14 @@ func (pm *ProtocolManager) synchronise(peer *peer) {
 	mode := downloader.FullSync
 
 	//***huanke add it to avoid every 10s sync, then no newBlogMsg to communicate
+	//if atomic.LoadUint32(&pm.synced) == 1 {
 	if atomic.LoadUint32(&pm.synced) == 1 {
-		glog.Infoln("@RD *******Not 1st Sync************")
+		glog.Infoln("@RD *******Not 1st Sync************, selfid ", pm.selfId)
 		return
 	}else{
 		glog.Infoln("@RD *******Is 1st Sync************")
 	}
+	glog.Infoln("@RD Synchronizing")
 	//*******************************************************
 
 	if atomic.LoadUint32(&pm.fastSync) == 1 {
